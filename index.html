@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Планировщик дня</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4facfe">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-192.png">
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW registered'))
+                    .catch(err => console.log('SW failed'));
+            });
+        }
+    </script>
+
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --header-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --header-gradient-dark: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+            --card-bg: rgba(20, 25, 40, 0.95);
+            --glass-bg: rgba(255,255,255,0.1);
+            --glass-light: rgba(255,255,255,0.2);
+            --task-bg: rgba(255,255,255,0.05);
+            --completed-bg: rgba(0, 0, 0, 0.3);
+            --text-color: white;
+            --shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            padding: 20px;
+            color: var(--text-color);
+            transition: all 0.3s ease;
+        }
+
+        body.dark-theme {
+            --bg-gradient: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
+            --card-bg: rgba(10, 15, 30, 0.98);
+            --header-gradient-dark: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+        }
+
+        .container {
+            max-width: 450px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            backdrop-filter: blur(20px);
+        }
+
+        .header {
+            background: var(--header-gradient);
+            transition: all 0.3s ease !important;
+            padding: 25px 30px;
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header h1 {
+            font-size: clamp(1.5em, 5vw, 2.2em) !important;
+            margin-bottom: 10px !important;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3) !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            line-height: 1.2 !important;
+            transition: all 0.3s ease !important;
+        }
+
+        #headerTitleDark {
+            font-size: clamp(1.5em, 5vw, 2.2em) !important; /* Тот же размер */
+        }
+
+        .counter {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding: 5px 20px 10px;
+        }
+
+        .counter-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: var(--glass-light);
+            padding: 8px 12px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            min-width: 75px;
+        }
+
+        .counter-label {
+            font-size: 0.85em;
+            font-weight: 600;
+            color: rgba(255,255,255,0.9);
+                        color: rgba(255,255,255,0.9);
+            margin-bottom: 2px;
+        }
+
+        .counter-number {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: white;
+        }
+
+        .theme-toggle, .settings-toggle {
+            position: absolute;
+            bottom: 15px;
+            width: 45px;
+            height: 45px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            z-index: 10;
+        }
+
+        .settings-toggle { left: 20px; }
+        .theme-toggle { right: 20px; }
+
+        .theme-toggle:hover, .settings-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .main {
+            padding: 25px 40px 15px;
+            background: transparent;
+        }
+
+        .add-task-btn {
+            width: 100%;
+            padding: 16px 25px;
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            border: none;
+            border-radius: 15px;
+            color: white;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 25px rgba(79, 172, 254, 0.3);
+        }
+
+        .add-task-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(79, 172, 254, 0.4);
+        }
+
+        .reset-btn {
+            width: 100%;
+            padding: 14px 25px;
+            background: var(--glass-bg);
+            border: 2px solid var(--glass-light);
+            border-radius: 12px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+            margin-top: 15px;
+        }
+
+        .reset-btn:hover {
+            background: rgba(255,107,107,0.25);
+            border-color: #ff6b6b;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255,107,107,0.2);
+        }
+
+        .datetime-container {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            text-align: right;
+            z-index: 1000;
+        }
+
+        .date-display {
+            font-size: 0.95em;
+            color: rgba(255,255,255,0.85);
+            margin-bottom: 4px;
+            font-weight: 500;
+            text-shadow: 0 1px 5px rgba(0,0,0,0.5);
+        }
+
+        .time-display {
+            font-size: 2.2em;
+            font-weight: 700;
+            color: white;
+            text-shadow: 0 3px 15px rgba(0,0,0,0.6);
+            letter-spacing: 2px;
+        }
+
+        /* 🎯 МОДУЛЬНАЯ СИСТЕМА */
+        .task-views {
+            margin: 20px auto;
+            max-width: 1400px;
+            padding: 0 20px;
+        }
+
+        .desktop-view {
+            display: flex;
+            gap: 25px;
+            align-items: flex-start;
+        }
+
+        .mobile-view {
+            display: none;
+        }
+
+        .column, .mobile-column {
+            background: rgba(40, 40, 60, 0.8);
+            border-radius: 20px;
+            padding: 30px 25px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+
+        .mobile-column {
+            background: rgba(40, 40, 60, 0.95);
+            border-radius: 25px;
+            min-height: 60vh;
+        }
+
+        .column h3, .mobile-column h3 {
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            text-align: center;
+            color: white;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .tasks-column {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            flex: 1;
+        }
+
+        /* ЗАДАЧИ */
+        .task-item {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            padding: 18px 25px 18px 30px;
+            background: var(--task-bg);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            cursor: grab;
+            user-select: none;
+            animation: fadeInUp 0.3s ease-out;
+            transition: all 0.2s;
+            touch-action: manipulation;
+        }
+
+        .task-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .task-item.completed {
+            opacity: 0.7;
+            background: var(--completed-bg);
+        }
+
+        .task-checkbox {
+            width: 22px;
+            height: 22px;
+            margin: 0 15px 0 8px;
+            accent-color: #1d4ed8;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .task-text {
+            flex: 1;
+            font-size: 16px;
+            color: var(--text-color);
+            padding: 0 15px;
+        }
+
+        .task-item.completed .task-text {
+            text-decoration: line-through;
+            color: rgba(255,255,255,0.7);
+        }
+
+        .delete-btn {
+                        background: #ff4757;
+            border: none;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
+            margin-left: 8px;
+            flex-shrink: 0;
+        }
+
+        .delete-btn:hover {
+            background: #ff3742;
+            transform: scale(1.1);
+        }
+
+        .task-item.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg) scale(1.05);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            z-index: 100;
+        }
+
+        .column.drag-over {
+            background: rgba(59, 130, 246, 0.2) !important;
+            border: 3px dashed #3b82f6 !important;
+            transform: scale(1.02) !important;
+        }
+
+        /* ПРИОРИТЕТЫ */
+        .task-item.priority-low { border-left: 4px solid #10b981; }
+        .task-item.priority-medium { border-left: 4px solid #DC9B22; }
+        .task-item.priority-high { border-left: 4px solid #b91c1c; }
+
+        .high-priority { border-top: 6px solid #b91c1c; }
+        .medium-priority { border-top: 6px solid #DC9B22; }
+        .low-priority { border-top: 6px solid #10b981; }
+
+        /* МОДАЛКИ */
+        .modal-overlay, .task-modal-overlay, .settings-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .settings-modal-overlay { z-index: 1002; }
+
+        .modal-window, .task-modal, .settings-modal {
+            width: 95vw !important;
+            max-width: 95vw !important;
+            padding: 25px 20px !important;
+            margin: 10px !important;
+            min-height: 300px !important;
+            max-height: 85vh !important;
+            border-radius: 15px !important;
+            box-sizing: border-box !important;
+        }
+
+        .task-modal { padding: 30px; }
+
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 100px;
+        }
+
+        .confirm-yes {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+        }
+
+        .confirm-yes:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(255, 107, 107, 0.4);
+        }
+
+        .confirm-no {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .confirm-no:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+
+        #taskTitleInput {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 16px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .priority-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .priority-btn {
+            flex: 1;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 80px;
+        }
+
+        .priority-low { background: #10b981; }
+        .priority-medium { background: #DC9B22; }
+        .priority-high { background: #ef4444; }
+
+        .priority-btn.selected {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        /* НАСТРОЙКИ */
+        .notification-section {
+            margin: 25px 0;
+        }
+
+        .notification-box {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 20px 25px;
+            background: rgba(255,255,255,0.08);
+            border: 2px solid rgba(255,255,255,0.25);
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(15px);
+            gap: 30px;
+            height: 65px;
+        }
+
+        .notification-box:hover {
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,255,255,0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .notification-box.enabled {
+            background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.15));
+            border-color: rgba(16,185,129,0.5);
+        }
+
+        .notification-label {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: white;
+            margin-right: auto;
+        }
+
+
+
+        .notification-status {
+            font-size: 1.0em;
+            font-weight: 700;
+            padding: 8px 16px;
+            border-radius: 20px;
+            min-width: 65px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .notification-status.off {
+            background: rgba(239,68,68,0.15);
+            color: #ef4444;
+            border: 2px solid rgba(239,68,68,0.4);
+        }
+
+        .notification-status.on {
+            background: rgba(16,185,129,0.2);
+            color: #10b981;
+            border: 2px solid rgba(16,185,129,0.5);
+            box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+        }
+
+        /* ЯЗЫКИ */
+        .language-section {
+            margin: 25px 0;
+            text-align: left;
+        }
+
+        .flag-select-container {
+            position: relative;
+            margin-top: 15px;
+        }
+
+        .selected-flag {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 15px 20px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        .selected-flag:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: rgba(255,255,255,0.5);
+            transform: translateY(-1px);
+        }
+
+        .dropdown-arrow {
+            margin-left: auto;
+            font-size: 14px;
+            transition: transform 0.3s;
+        }
+
+        .selected-flag.active .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .flag-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: rgba(30, 60, 114, 0.95);
+            border-radius: 12px;
+            margin-top: 8px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+            max-height: 200px;
+            overflow-y: auto;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+        }
+
+        .flag-dropdown.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .flag-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 15px 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .flag-option:last-child {
+            border-bottom: none;
+        }
+
+        .flag-option:hover {
+            background: rgba(255,255,255,0.15);
+            padding-left: 25px;
+        }
+
+        /* АНИМАЦИИ */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* СКРОЛЛБАР */
+        .column::-webkit-scrollbar, .mobile-column::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .column::-webkit-scrollbar-track, .mobile-column::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+        }
+
+        .column::-webkit-scrollbar-thumb, .mobile-column::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.3);
+            border-radius: 10px;
+        }
+
+        .column::-webkit-scrollbar-thumb:hover, .mobile-column::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.5);
+        }
+
+        /* МОБИЛЬНАЯ АДАПТИВНОСТЬ */
+        @media (max-width: 768px) {
+            /* ЧАСЫ - скрываем */
+            .datetime-container {
+                display: none !important;
+            }
+
+            /* УВЕДОМЛЕНИЯ - компактные */
+            .notification-label {
+                font-size: 1em !important;
+            }
+            .notification-status {
+                font-size: 0.85em !important;
+                padding: 6px 12px !important;
+                min-width: 55px !important;
+                min-height: 28px !important;
+            }
+            .notification-box {
+                height: 55px !important;
+                padding: 15px 20px !important;
+                gap: 20px !important;
+            }
+
+            /* ШАПКА - компактная */
+            .header h1, #headerTitleDark {
+                font-size: clamp(1.3em, 6vw, 1.8em) !important;
+                padding: 0 40px !important;
+                white-space: nowrap !important;
+            }
+
+            /* МОДАЛКИ - полноэкранные */
+            .modal-overlay, .task-modal-overlay, .settings-modal-overlay {
+                padding: 10px !important;
+                justify-content: center !important;
+                align-items: center !important;
+            }
+
+            .modal-window, .task-modal, .settings-modal {
+                width: 95vw !important;
+                max-width: 95vw !important;
+                padding: 25px 20px !important;
+                min-height: 300px !important;
+                max-height: 85vh !important;
+                border-radius: 15px !important;
+                margin: 10px !important;
+                box-sizing: border-box !important;
+            }
+
+            .modal-btn {
+                padding: 12px 20px !important;
+                min-height: 48px !important;
+                flex: 1 !important;
+            }
+
+            /* КОНТЕЙНЕР - полноэкранный */
+            .container {
+                width: 100vw !important;
+                max-width: 100vw !important;
+                margin: 0 !important;
+                border-radius: 0 !important;
+            }
+
+            /* МОБИЛЬНЫЕ ОСНОВНЫЕ */
+            body { padding: 10px !important; }
+            .desktop-view { display: none !important; }
+            .mobile-view { display: block !important; }
+            .time-display { font-size: 1.8em !important; }
+            .task-item { padding: 20px !important; margin-bottom: 15px !important; }
+        }
+
+
+
+
+    </style>
+</head>
+
+<body>
+    <!-- КОНТЕЙНЕР КОНТРОЛОВ -->
+    <div class="container">
+                <div class="header">
+            <h1 id="headerTitle">📋 Day Planner</h1>
+            <h1 id="headerTitleDark" style="display: none;">🌙 Night Planner</h1>
+            <div class="counter">
+                <div class="counter-item">
+                    <span class="counter-label" data-i18n="total">Всего:</span>
+                    <span id="total" class="counter-number">0</span>
+                </div>
+                <div class="counter-item">
+                    <span class="counter-label" data-i18n="done">Сделано:</span>
+                    <span id="completed" class="counter-number">0</span>
+                </div>
+            </div>
+            <button class="theme-toggle settings-toggle" id="settingsToggle">⚙️</button>
+            <button class="theme-toggle" id="themeToggle">🌙</button>
+        </div>
+
+        <div class="main">
+            <button id="addBtn" class="add-task-btn" data-i18n="newTask">➕ Новая задача</button>
+            <button class="reset-btn" id="resetBtn" data-i18n="resetAll">🔄 Сбросить все задачи</button>
+        </div>
+    </div>
+
+    <!-- ЧАСЫ -->
+    <div class="datetime-container" id="datetimeContainer">
+        <div class="date-display" id="dateDisplay">Воскресенье, 22 февраля 2026</div>
+        <div class="time-display" id="timeDisplay">03:57</div>
+    </div>
+
+    <!-- 🎯 МОДУЛЬНЫЕ ВЬЮ -->
+    <div class="task-views">
+        <!-- ДЕСКТОП: 3 КОНКОЛКИ -->
+        <div class="desktop-view">
+            <div class="column high-priority">
+                <h3 id="highTitle">🔴 Высокий приоритет</h3>
+                <ul class="tasks-column" id="highTasks"></ul>
+            </div>
+            <div class="column medium-priority">
+                <h3 id="mediumTitle">🟠 Средний приоритет</h3>
+                <ul class="tasks-column" id="mediumTasks"></ul>
+            </div>
+            <div class="column low-priority">
+                <h3 id="lowTitle">🟢 Низкий приоритет</h3>
+                <ul class="tasks-column" id="lowTasks"></ul>
+            </div>
+        </div>
+
+        <!-- МОБИЛЬНЫЙ: 1 КОЛОНКА -->
+        <div class="mobile-view">
+            <div class="mobile-column">
+                <h3>📱 Все задачи</h3>
+                <ul class="tasks-column" id="mobileTasks"></ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ✅ МОДАЛКИ -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-window">
+            <h3 data-i18n="confirmTitle">⚠️ Подтверждение</h3>
+            <p data-i18n="confirmText">Вы уверены что хотите удалить все задачи?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn confirm-yes" id="confirmYes" data-i18n="yesDelete">Да, удалить</button>
+                <button class="modal-btn confirm-no" id="confirmNo">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="task-modal-overlay" id="taskModalOverlay">
+        <div class="task-modal">
+            <h3 data-i18n="newTask">➕ Новая задача</h3>
+            <input type="text" id="taskTitleInput" placeholder="Название задачи..." maxlength="100">
+            <div class="priority-buttons">
+                <button class="priority-btn priority-low" data-priority="low" data-i18n="low">🟢 Низкий</button>
+                <button class="priority-btn priority-medium selected" data-priority="medium" data-i18n="medium">🟡 Средний</button>
+                <button class="priority-btn priority-high" data-priority="high" data-i18n="high">🔴 Высокий</button>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn confirm-yes" id="addTaskConfirm">➕ Создать</button>
+                <button class="modal-btn confirm-no" id="addTaskCancel">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-modal-overlay" id="settingsModalOverlay">
+        <div class="settings-modal">
+            <h3>⚙️ Настройки</h3>
+            <div class="notification-section">
+                <div class="notification-box" id="notificationToggle">
+                    <span class="notification-label" data-i18n="notifications">Уведомления</span>
+                    <span class="notification-status" id="notificationsStatus">выкл</span>
+                </div>
+            </div>
+            <div class="language-section">
+                <div class="flag-select-container">
+                    <div class="selected-flag" id="selectedFlag">
+                        <span class="flag-emoji" id="currentFlag">🇷🇺</span>
+                        <span class="flag-text" id="currentLangName">Русский</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </div>
+                    <div class="flag-dropdown" id="flagDropdown">
+                        <div class="flag-option" data-lang="ru"><span class="flag-emoji">🇷🇺</span><span class="flag-text">Русский</span></div>
+                                                <div class="flag-option" data-lang="en"><span class="flag-emoji">🇺🇸</span><span class="flag-text">English</span></div>
+                        <div class="flag-option" data-lang="es"><span class="flag-emoji">🇪🇸</span><span class="flag-text">Español</span></div>
+                        <div class="flag-option" data-lang="de"><span class="flag-emoji">🇩🇪</span><span class="flag-text">Deutsch</span></div>
+                        <div class="flag-option" data-lang="fr"><span class="flag-emoji">🇫🇷</span><span class="flag-text">Français</span></div>
+                        <div class="flag-option" data-lang="it"><span class="flag-emoji">🇮🇹</span><span class="flag-text">Italiano</span></div>
+                        <div class="flag-option" data-lang="pt"><span class="flag-emoji">🇧🇷</span><span class="flag-text">Português</span></div>
+                        <div class="flag-option" data-lang="zh"><span class="flag-emoji">🇨🇳</span><span class="flag-text">中文</span></div>
+                        <div class="flag-option" data-lang="ja"><span class="flag-emoji">🇯🇵</span><span class="flag-text">日本語</span></div>
+                        <div class="flag-option" data-lang="ko"><span class="flag-emoji">🇰🇷</span><span class="flag-text">한국어</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn confirm-no" id="closeSettings">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 🎯 ГЛОБАЛЬНОЕ СОСТОЯНИЕ
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+        let draggedTaskIndex = null;
+        let currentLang = localStorage.getItem('lang') || 'ru';
+        let currentDeviceMode = null;
+
+        // 🔧 УТИЛИТЫ
+        function getElement(id) { return document.getElementById(id); }
+
+        // 🌐 i18n СЛОВАРЬ (с уведомлениями!)
+        const i18nBase = {
+            ru: {
+                newTask: '➕ Новая задача', resetAll: '🔄 Сбросить все задачи', 
+                total: 'Всего:', done: 'Сделано:', low: '🟢 Низкий', medium: '🟡 Средний', high: '🔴 Высокий',
+                columnLow: '🟢 Низкий приоритет', columnMedium: '🟡 Средний приоритет', columnHigh: '🔴 Высокий приоритет',
+                confirmTitle: '⚠️ Подтверждение', confirmText: 'Вы уверены что хотите удалить все задачи?', yesDelete: 'Да, удалить',
+                notifications: '🔔 Уведомления', enabled: 'вкл', disabled: 'выкл',
+                notificationTitle: '📋 Новая задача!', notificationBody: 'Не забудьте выполнить задачу!'
+            },
+            en: {
+                newTask: '➕ New task', resetAll: '🔄 Reset all tasks', 
+                total: 'Total:', done: 'Done:', low: '🟢 Low', medium: '🟡 Medium', high: '🔴 High',
+                columnLow: '🟢 Low priority', columnMedium: '🟡 Medium priority', columnHigh: '🔴 High priority',
+                confirmTitle: '⚠️ Confirmation', confirmText: 'Are you sure you want to delete all tasks?', yesDelete: 'Yes, delete',
+                notifications: '🔔 Notifications', enabled: 'on', disabled: 'off',
+                notificationTitle: '📋 New task!', notificationBody: "Don't forget your task!"
+            }
+        };
+
+        function t(key) { return i18nBase[currentLang]?.[key] || key; }
+
+        // 📱 ДЕТЕКЦИЯ УСТРОЙСТВА
+        function detectDeviceMode() {
+            const width = window.innerWidth;
+            return width <= 768 ? 'mobile' : 'desktop';
+        }
+
+        // 🎨 РЕНДЕРЕРЫ (МОДУЛЬНАЯ СИСТЕМА)
+        const renderers = {
+            desktop: {
+                render(tasks) {
+                    ['highTasks', 'mediumTasks', 'lowTasks'].forEach(id => getElement(id).innerHTML = '');
+                    if (tasks.length === 0) {
+                        getElement('highTasks').innerHTML = '<li style="color:#888;text-align:center;padding:40px 20px">📭 Нет задач</li>';
+                        return;
+                    }
+                    tasks.forEach((task, index) => {
+                        const li = document.createElement('li');
+                        li.className = `task-item priority-${task.priority || 'medium'} ${task.completed ? 'completed' : ''}`;
+                        li.dataset.taskIndex = index;
+                        li.draggable = true;
+                        li.innerHTML = `
+                            <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''}>
+                            <span class="task-text">${task.text}</span>
+                            <button class="delete-btn">✕</button>
+                        `;
+                        li.querySelector('.task-checkbox').addEventListener('change', () => toggleTask(index));
+                        li.querySelector('.delete-btn').addEventListener('click', () => deleteTask(index));
+                        li.addEventListener('dragstart', dragStart);
+                        li.addEventListener('dragend', dragEnd);
+
+                        const columns = { high: 'highTasks', medium: 'mediumTasks', low: 'lowTasks' };
+                        getElement(columns[task.priority || 'medium']).appendChild(li);
+                    });
+                    initDragAndDrop();
+                }
+            },
+
+        mobile: {
+            render(tasks) {
+                const mobileTasks = getElement('mobileTasks');
+                mobileTasks.innerHTML = '';
+
+                if (tasks.length === 0) {
+                    mobileTasks.innerHTML = '<li style="color:#888;text-align:center;padding:40px 20px">📭 Нет задач</li>';
+                    return;
+                }
+
+                tasks.forEach((task, index) => {
+                    const originalIndex = tasks.findIndex(t => 
+                        t.text === task.text && t.priority === task.priority
+                    );
+                    const li = document.createElement('li');
+                    li.className = `task-item priority-${task.priority || 'medium'} ${task.completed ? 'completed' : ''}`;
+                    li.dataset.taskIndex = originalIndex;
+                    li.innerHTML = `
+                        <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''}>
+                        <span class="task-text">${task.text}</span>
+                        <button class="delete-btn">✕</button>
+                    `;
+                    li.querySelector('.task-checkbox').addEventListener('change', () => toggleTask(originalIndex));
+                    li.querySelector('.delete-btn').addEventListener('click', () => deleteTask(originalIndex));
+                    mobileTasks.appendChild(li);
+                });
+            }
+        }
+
+
+        // 🖱️ DRAG & DROP
+        function dragStart(e) {
+            draggedTaskIndex = parseInt(e.target.closest('.task-item').dataset.taskIndex);
+            e.target.closest('.task-item').classList.add('dragging');
+        }
+
+        function dragEnd() { draggedTaskIndex = null; }
+
+        function initDragAndDrop() {
+            document.querySelectorAll('.column').forEach(column => {
+                column.addEventListener('dragover', e => { e.preventDefault(); column.classList.add('drag-over'); });
+                column.addEventListener('dragleave', e => {
+                    if (!column.contains(e.relatedTarget)) column.classList.remove('drag-over');
+                });
+                column.addEventListener('drop', e => {
+                    e.preventDefault();
+                    column.classList.remove('drag-over');
+                    if (draggedTaskIndex !== null) {
+                        const priority = column.classList.contains('high-priority') ? 'high' :
+                                       column.classList.contains('medium-priority') ? 'medium' : 'low';
+                        tasks[draggedTaskIndex].priority = priority;
+                        renderTasks();
+                    }
+                });
+            });
+        }
+
+        // ✅ ОСНОВНЫЕ ФУНКЦИИ
+        function renderTasks() {
+        const mode = detectDeviceMode();
+
+        // 🔥 ФИКС 1: Выполненные задачи ВНИЗ
+        const sortedTasks = [...tasks].sort((a, b) => {
+            // Сначала НЕвыполненные, потом выполненные
+            if (a.completed !== b.completed) {
+                return a.completed - b.completed;
+            }
+            return 0;
+        });
+
+        // 🔥 ФИКС 2: Мобильная сортировка по важности
+        if (mode === 'mobile') {
+            sortedTasks.sort((a, b) => {
+                const priorityOrder = { high: 3, medium: 2, low: 1 };
+                return priorityOrder[b.priority || 'medium'] - priorityOrder[a.priority || 'medium'];
+            });
+        }
+
+        renderers[mode].render(sortedTasks);
+        localStorage.setItem('tasks', JSON.stringify(tasks));
+        updateCounters();
+    }
+
+        function updateCounters() {
+            getElement('total').textContent = tasks.length;
+            getElement('completed').textContent = tasks.filter(t => t.completed).length;
+        }
+
+        function toggleTask(index) {
+            if (index >= 0 && index < tasks.length) {
+                tasks[index].completed = !tasks[index].completed;
+                renderTasks();
+            }
+        }
+
+        function deleteTask(index) {
+            if (index >= 0 && index < tasks.length) {
+                tasks.splice(index, 1);
+                renderTasks();
+            }
+        }
+
+        function addTask() {
+            const text = getElement('taskTitleInput').value.trim();
+            if (!text) return;
+            const priority = document.querySelector('.priority-btn.selected')?.dataset.priority || 'medium';
+            tasks.unshift({ text, completed: false, priority });
+            getElement('taskTitleInput').value = '';
+            getElement('taskModalOverlay').style.display = 'none';
+            renderTasks();
+            showNotification();
+        }
+
+        function showNotification() {
+            if (localStorage.getItem('notificationsEnabled') !== 'true' || Notification.permission !== 'granted') return;
+            new Notification(t('notificationTitle'), {
+                body: t('notificationBody'),
+                icon: 'icons/icon-192.png'
+            });
+        }
+
+        // 🌍 ЛОКАЛИЗАЦИЯ
+        function applyTranslations() {
+            document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+            getElement('highTitle').textContent = t('columnHigh');
+            getElement('mediumTitle').textContent = t('columnMedium');
+            getElement('lowTitle').textContent = t('columnLow');
+        }
+
+        function changeLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('lang', lang);
+            applyTranslations();
+            updateLanguageDisplay();
+        }
+
+        function updateLanguageDisplay() {
+            const flagOptions = document.querySelectorAll('#flagDropdown .flag-option');
+            flagOptions.forEach(option => {
+                if (option.dataset.lang === currentLang) {
+                    getElement('currentFlag').textContent = option.querySelector('.flag-emoji').textContent;
+                    getElement('currentLangName').textContent = option.querySelector('.flag-text').textContent;
+                }
+            });
+        }
+
+        // ⏰ ЧАСЫ
+        function updateTime() {
+            const now = new Date();
+            getElement('timeDisplay').textContent = now.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+            getElement('dateDisplay').textContent = now.toLocaleDateString('ru-RU', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
+        }
+
+        // 🚀 ИНИЦИАЛИЗАЦИЯ
+        document.addEventListener('DOMContentLoaded', () => {
+            // Локализация
+            updateLanguageDisplay();
+            applyTranslations();
+
+            // Флаги
+            getElement('selectedFlag').addEventListener('click', () => getElement('flagDropdown').classList.toggle('show'));
+            document.querySelectorAll('#flagDropdown .flag-option').forEach(option => {
+                option.addEventListener('click', () => {
+                    changeLanguage(option.dataset.lang);
+                    getElement('flagDropdown').classList.remove('show');
+                });
+            });
+            document.addEventListener('click', e => {
+                const dropdown = getElement('flagDropdown');
+                const flag = getElement('selectedFlag');
+                if (!dropdown.contains(e.target) && !flag.contains(e.target)) dropdown.classList.remove('show');
+            });
+
+            // Кнопки
+            getElement('addBtn').addEventListener('click', () => getElement('taskModalOverlay').style.display = 'block');
+            getElement('addTaskConfirm').addEventListener('click', addTask);
+            getElement('addTaskCancel').addEventListener('click', () => {
+                getElement('taskModalOverlay').style.display = 'none';
+                getElement('taskTitleInput').value = '';
+                document.querySelectorAll('.priority-btn').forEach(btn => btn.classList.remove('selected'));
+                document.querySelector('.priority-medium').classList.add('selected');
+            });
+            getElement('resetBtn').addEventListener('click', () => getElement('modalOverlay').style.display = 'block');
+            getElement('confirmYes').addEventListener('click', () => {
+                tasks = [];
+                localStorage.setItem('tasks', JSON.stringify(tasks));
+                getElement('modalOverlay').style.display = 'none';
+                renderTasks();
+            });
+            getElement('confirmNo').addEventListener('click', () => getElement('modalOverlay').style.display = 'none');
+            getElement('settingsToggle').addEventListener('click', () => getElement('settingsModalOverlay').style.display = 'block');
+            getElement('closeSettings').addEventListener('click', () => getElement('settingsModalOverlay').style.display = 'none');
+
+            // Модалки backdrop
+            ['taskModalOverlay', 'modalOverlay', 'settingsModalOverlay'].forEach(id => {
+                getElement(id).addEventListener('click', e => {
+                    if (e.target === getElement(id)) getElement(id).style.display = 'none';
+                });
+            });
+
+            // Приоритеты
+            document.querySelectorAll('.priority-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.priority-btn').forEach(b => b.classList.remove('selected'));
+                    this.classList.add('selected');
+                });
+            });
+
+            // Тема
+            getElement('themeToggle').addEventListener('click', () => {
+                document.body.classList.toggle('dark-theme');
+                const isDark = document.body.classList.contains('dark-theme');
+                getElement('headerTitle').style.display = isDark ? 'none' : 'block';
+                getElement('headerTitleDark').style.display = isDark ? 'block' : 'none';
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            });
+
+            // Уведомления
+            const notificationToggle = getElement('notificationToggle');
+            const notificationsStatus = getElement('notificationsStatus');
+            const savedState = localStorage.getItem('notificationsEnabled');
+            const isEnabled = savedState === 'true' && Notification.permission === 'granted';
+            
+            notificationsStatus.textContent = isEnabled ? t('enabled') : t('disabled');
+            notificationsStatus.className = isEnabled ? 'notification-status on' : 'notification-status off';
+            notificationToggle.classList.toggle('enabled', isEnabled);
+
+            notificationToggle.addEventListener('click', async () => {
+                const willEnable = !notificationToggle.classList.contains('enabled');
+                if (willEnable && 'Notification' in window && Notification.permission !== 'granted') {
+                    const permission = await Notification.requestPermission();
+                    if (permission !== 'granted') return;
+                }
+                localStorage.setItem('notificationsEnabled', willEnable);
+                notificationsStatus.textContent = willEnable ? t('enabled') : t('disabled');
+                notificationsStatus.className = willEnable ? 'notification-status on' : 'notification-status off';
+                notificationToggle.classList.toggle('enabled', willEnable);
+            });
+
+            // Горячие клавиши
+            document.addEventListener('keydown', e => {
+                if (e.target.tagName === 'INPUT') return;
+                if (e.key === 'Escape') {
+                    ['taskModalOverlay', 'modalOverlay', 'settingsModalOverlay'].forEach(id => getElement(id).style.display = 'none');
+                    getElement('taskTitleInput').value = '';
+                }
+                if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'n' || e.key === 'й')) {
+                    e.preventDefault();
+                    getElement('addBtn').click();
+                }
+            });
+
+            // Восстановление темы
+            if (localStorage.getItem('theme') === 'dark') {
+                document.body.classList.add('dark-theme');
+                getElement('headerTitle').style.display = 'none';
+                getElement('headerTitleDark').style.display = 'block';
+            }
+
+            // 🚀 СТАРТ
+            renderTasks();
+            updateTime();
+            setInterval(updateTime, 1000);
+            window.addEventListener('resize', renderTasks);
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+           
