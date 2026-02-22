@@ -877,7 +877,7 @@
         }
 
         // 🎨 РЕНДЕРЕРЫ (МОДУЛЬНАЯ СИСТЕМА)
-                const renderers = {
+                       const renderers = {
             desktop: {
                 render(tasks) {
                     ['highTasks', 'mediumTasks', 'lowTasks'].forEach(id => getElement(id).innerHTML = '');
@@ -905,7 +905,7 @@
                     });
                     initDragAndDrop();
                 }
-            }
+            },
 
             mobile: {
                 render(tasks) {
@@ -936,7 +936,6 @@
                 }
             }
         };
-
 
         // 🖱️ DRAG & DROP
         function dragStart(e) {
