@@ -877,7 +877,7 @@
         }
 
         // 🎨 РЕНДЕРЕРЫ (МОДУЛЬНАЯ СИСТЕМА)
-        const renderers = {
+                const renderers = {
             desktop: {
                 render(tasks) {
                     ['highTasks', 'mediumTasks', 'lowTasks'].forEach(id => getElement(id).innerHTML = '');
@@ -905,36 +905,37 @@
                     });
                     initDragAndDrop();
                 }
-            },
-
-        mobile: {
-            render(tasks) {
-                const mobileTasks = getElement('mobileTasks');
-                mobileTasks.innerHTML = '';
-
-                if (tasks.length === 0) {
-                    mobileTasks.innerHTML = '<li style="color:#888;text-align:center;padding:40px 20px">📭 Нет задач</li>';
-                    return;
-                }
-
-                tasks.forEach((task, index) => {
-                    const originalIndex = tasks.findIndex(t => 
-                        t.text === task.text && t.priority === task.priority
-                    );
-                    const li = document.createElement('li');
-                    li.className = `task-item priority-${task.priority || 'medium'} ${task.completed ? 'completed' : ''}`;
-                    li.dataset.taskIndex = originalIndex;
-                    li.innerHTML = `
-                        <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''}>
-                        <span class="task-text">${task.text}</span>
-                        <button class="delete-btn">✕</button>
-                    `;
-                    li.querySelector('.task-checkbox').addEventListener('change', () => toggleTask(originalIndex));
-                    li.querySelector('.delete-btn').addEventListener('click', () => deleteTask(originalIndex));
-                    mobileTasks.appendChild(li);
-                });
             }
-        }
+
+            mobile: {
+                render(tasks) {
+                    const mobileTasks = getElement('mobileTasks');
+                    mobileTasks.innerHTML = '';
+
+                    if (tasks.length === 0) {
+                        mobileTasks.innerHTML = '<li style="color:#888;text-align:center;padding:40px 20px">📭 Нет задач</li>';
+                        return;
+                    }
+
+                    tasks.forEach((task, index) => {
+                        const originalIndex = tasks.findIndex(t => 
+                            t.text === task.text && t.priority === task.priority
+                        );
+                        const li = document.createElement('li');
+                        li.className = `task-item priority-${task.priority || 'medium'} ${task.completed ? 'completed' : ''}`;
+                        li.dataset.taskIndex = originalIndex;
+                        li.innerHTML = `
+                            <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''}>
+                            <span class="task-text">${task.text}</span>
+                            <button class="delete-btn">✕</button>
+                        `;
+                        li.querySelector('.task-checkbox').addEventListener('change', () => toggleTask(originalIndex));
+                        li.querySelector('.delete-btn').addEventListener('click', () => deleteTask(originalIndex));
+                        mobileTasks.appendChild(li);
+                    });
+                }
+            }
+        };
 
 
         // 🖱️ DRAG & DROP
